@@ -1,16 +1,12 @@
 package main
 
 import (
-	"fmt"
-	"nomadcoin/blockchain"
+	"nomadcoin/explorer"
+	"nomadcoin/rest"
 )
 
 func main() {
-	chain := blockchain.GetBlockchain()
-	chain.AddBlock("Second Block")
-	chain.AddBlock("Third Block")
-	chain.AddBlock("Fourth Block")
-	for _, block := range chain.AllBlocks() {
-		fmt.Println(block.Data)
-	}
+	rest.Start(4000)
+	explorer.Start(3000)
+
 }
