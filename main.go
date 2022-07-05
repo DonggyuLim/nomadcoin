@@ -1,12 +1,10 @@
 package main
 
 import (
-	"nomadcoin/explorer"
-	"nomadcoin/rest"
+	"nomadcoin/cli"
 )
 
 func main() {
-	rest.Start(4000)
-	explorer.Start(3000)
+	cli.Start()
 
 }

@@ -1,14 +1,14 @@
 package explorer
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"text/template"
 
 	"nomadcoin/blockchain"
-
-	"github.com/gorilla/mux"
+	"nomadcoin/utils"
 )
 
 const (
@@ -23,27 +23,32 @@ type homeData struct {
 }
 
 func home(rw http.ResponseWriter, r *http.Request) {
-	data := homeData{"Home", blockchain.GetBlockchain().AllBlocks()}
+	data := homeData{"Home", nil}
 	templates.ExecuteTemplate(rw, "home", data)
 }
+
+type addBlockBody struct {
+	Message string
+}
+
 func add(rw http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
 		templates.ExecuteTemplate(rw, "add", nil)
 	case "POST":
-		r.ParseForm()
-		data := r.Form.Get("blockData")
-		blockchain.GetBlockchain().AddBlock(data)
+		var addBlockBody addBlockBody
+		utils.HandleErr(json.NewDecoder(r.Body).Decode(&addBlockBody))
+		blockchain.GetBlockchain().AddBlock(addBlockBody.Message)
 		http.Redirect(rw, r, "/", http.StatusPermanentRedirect)
 	}
 }
 
 func Start(port int) {
-	router := mux.NewRouter()
+	handler := http.NewServeMux()
 	templates = template.Must(template.ParseGlob(templateDir + "pages/*.gohtml"))
 	templates = template.Must(templates.ParseGlob(templateDir + "partials/*.gohtml"))
-	router.HandleFunc("/", home)
-	router.HandleFunc("/add", add)
+	handler.HandleFunc("/", home)
+	handler.HandleFunc("/add", add)
 	fmt.Printf("Listening on http://localhost:%d\n", port)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), router))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), handler))
 }
