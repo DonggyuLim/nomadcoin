@@ -38,7 +38,7 @@ func add(rw http.ResponseWriter, r *http.Request) {
 	case "POST":
 		var addBlockBody addBlockBody
 		utils.HandleErr(json.NewDecoder(r.Body).Decode(&addBlockBody))
-		blockchain.GetBlockchain().AddBlock(addBlockBody.Message)
+		blockchain.Blockchain().AddBlock(addBlockBody.Message)
 		http.Redirect(rw, r, "/", http.StatusPermanentRedirect)
 	}
 }

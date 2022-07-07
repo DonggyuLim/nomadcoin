@@ -1,10 +1,10 @@
 package blockchain
 
 import (
-	"bytes"
 	"crypto/sha256"
-	"encoding/gob"
+	"errors"
 	"fmt"
+
 	"nomadcoin/db"
 	"nomadcoin/utils"
 )
@@ -16,15 +16,26 @@ type Block struct {
 	Height   int    `json:"height"`
 }
 
-func (b *Block) toBytes() []byte {
-	var blockBuffer bytes.Buffer
-	encoder := gob.NewEncoder(&blockBuffer)
-	utils.HandleErr(encoder.Encode(b))
-	return blockBuffer.Bytes()
+func (b *Block) persist() {
+	db.SaveBlock(b.Hash, utils.ToBytes(b))
 }
 
-func (b *Block) persist() {
-	db.SaveBlock(b.Hash, b.toBytes())
+//DB 에서 받은 byte slice를 Decode 함. 
+func (b *Block) restore(data []byte) {
+	utils.FromBytes(b, data)
+
+}
+
+var ErrNotFound = errors.New("block not found")
+
+func FindBlock(hash string) (*Block, error) {
+	blockBytes := db.Block(hash)
+	if blockBytes == nil {
+		return nil, ErrNotFound
+	}
+	block := &Block{}
+	block.restore(blockBytes)
+	return block, nil
 }
 
 func createBlock(data string, prevHash string, height int) *Block {

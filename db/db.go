@@ -1,7 +1,6 @@
 package db
 
 import (
-	"fmt"
 	"nomadcoin/utils"
 	"sync"
 
@@ -13,9 +12,10 @@ var db *bolt.DB
 var once sync.Once
 
 const (
-	dbName       = "blochain.db"
+	dbName       = "blockchain.db"
 	dataBucket   = "data"
 	blocksBucket = "blocks"
+	checkpoint   = "checkpoint"
 )
 
 func DB() *bolt.DB {
@@ -38,7 +38,7 @@ func DB() *bolt.DB {
 }
 
 func SaveBlock(hash string, data []byte) {
-	fmt.Printf("Saving	Block %s\nData::%b\n", hash, data)
+
 	err := DB().Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(blocksBucket))
 		err := bucket.Put([]byte(hash), data)
@@ -50,10 +50,36 @@ func SaveBlock(hash string, data []byte) {
 func SaveBlockChain(data []byte) {
 	err := DB().Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(dataBucket))
-		err := bucket.Put([]byte("checkpoint"), data)
+		err := bucket.Put([]byte(checkpoint), data)
 		return err
 	})
 	utils.HandleErr(err)
 }
 
 //bolt 는 정렬기능이 없음 key value 저장소이기 때문에
+
+func Checkpoint() []byte {
+	var data []byte
+	err := DB().View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte(dataBucket))
+		data = bucket.Get([]byte(checkpoint))
+		//Get =return  slice or nil
+		return nil
+	})
+
+	utils.HandleErr(err)
+	return data
+}
+
+func Block(hash string) []byte {
+	var data []byte
+	err := DB().View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte(blocksBucket))
+		data = bucket.Get([]byte(hash))
+		//bucket.Get() =return  slice or nil
+		return nil
+	})
+
+	utils.HandleErr(err)
+	return data
+}
