@@ -37,6 +37,10 @@ func DB() *bolt.DB {
 	return db
 }
 
+func Close() {
+	DB().Close()
+}
+
 func SaveBlock(hash string, data []byte) {
 
 	err := DB().Update(func(tx *bolt.Tx) error {
@@ -47,7 +51,7 @@ func SaveBlock(hash string, data []byte) {
 	utils.HandleErr(err)
 }
 
-func SaveBlockChain(data []byte) {
+func SaveCheckPoint(data []byte) {
 	err := DB().Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(dataBucket))
 		err := bucket.Put([]byte(checkpoint), data)
@@ -60,6 +64,7 @@ func SaveBlockChain(data []byte) {
 
 func Checkpoint() []byte {
 	var data []byte
+	//DB.View()는 read-only 트랜잭션
 	err := DB().View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(dataBucket))
 		data = bucket.Get([]byte(checkpoint))

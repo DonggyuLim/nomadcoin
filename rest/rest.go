@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	"nomadcoin/blockchain"
+	"nomadcoin/utils"
 
 	"github.com/gorilla/mux"
 )
@@ -41,7 +42,7 @@ type addBlockBody struct {
 }
 
 type errorRespons struct {
-	errorMessage string `json:"errorMessage"`
+	ErrorMessage string `json:"errorMessage"`
 }
 
 func documentation(rw http.ResponseWriter, r *http.Request) {
@@ -56,7 +57,11 @@ func documentation(rw http.ResponseWriter, r *http.Request) {
 
 			Description: "See Documentation",
 		},
-
+		{
+			URL:         url("/status"),
+			Method:      "GET",
+			Description: "See the Status of the blockchain",
+		},
 		{
 
 			URL: url("/blocks"),
@@ -95,20 +100,18 @@ func blocks(rw http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 
 	case "GET":
-		return
+
 		// rw.Header().Add("Content-Type", "application/json")
 
-		// json.NewEncoder(rw).Encode(blockchain.GetBlockchain().AllBlocks())
+		json.NewEncoder(rw).Encode(blockchain.Blockchain().Blocks())
 
 	case "POST":
-		return
-		/* var addBlockBody addBlockBody
-
+		var addBlockBody addBlockBody
 		utils.HandleErr(json.NewDecoder(r.Body).Decode(&addBlockBody))
 
-		blockchain.GetBlockchain().AddBlock(addBlockBody.Message)
+		blockchain.Blockchain().AddBlock(addBlockBody.Message)
 
-		rw.WriteHeader(http.StatusCreated)*/
+		rw.WriteHeader(http.StatusCreated)
 	}
 }
 
@@ -124,25 +127,33 @@ func block(rw http.ResponseWriter, r *http.Request) {
 
 	encoder := json.NewEncoder(rw)
 	if err == blockchain.ErrNotFound {
-		encoder.Encode(errorRespons{fmt.Sprintf("%v", err)})
+		errMessage := errorRespons{fmt.Sprintf("%v", err)}
+		encoder.Encode(errMessage)
+
 	} else {
 		encoder.Encode(block)
 	}
-
 }
+
+//response = latest block of blockchain
+func status(rw http.ResponseWriter, r *http.Request) {
+	json.NewEncoder(rw).Encode(blockchain.Blockchain())
+}
+
 func jsonContentTypeMiddleWare(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		rw.Header().Add("Content-Type", "application/json")
 		next.ServeHTTP(rw, r)
 	})
 }
+
 func Start(aPort int) {
 	router := mux.NewRouter()
 	//모든 요청에 	rw.Header().Add("Content-Type", "application/json") 해줌.
-
 	port = fmt.Sprintf(":%d", aPort)
 	router.Use(jsonContentTypeMiddleWare)
 	router.HandleFunc("/", documentation).Methods("GET")
+	router.HandleFunc("/status", status)
 	router.HandleFunc("/blocks/{hash:[a-f0-9]+}", block).Methods("GET")
 	router.HandleFunc("/blocks", blocks).Methods("GET", "POST")
 	fmt.Printf("Listening on http://localhost%s\n", port)
