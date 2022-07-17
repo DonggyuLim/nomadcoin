@@ -1,14 +1,12 @@
 package explorer
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"text/template"
 
 	"nomadcoin/blockchain"
-	"nomadcoin/utils"
 )
 
 const (
@@ -27,18 +25,13 @@ func home(rw http.ResponseWriter, r *http.Request) {
 	templates.ExecuteTemplate(rw, "home", data)
 }
 
-type addBlockBody struct {
-	Message string
-}
-
 func add(rw http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
 		templates.ExecuteTemplate(rw, "add", nil)
 	case "POST":
-		var addBlockBody addBlockBody
-		utils.HandleErr(json.NewDecoder(r.Body).Decode(&addBlockBody))
-		blockchain.Blockchain().AddBlock(addBlockBody.Message)
+
+		blockchain.Blockchain().AddBlock()
 		http.Redirect(rw, r, "/", http.StatusPermanentRedirect)
 	}
 }

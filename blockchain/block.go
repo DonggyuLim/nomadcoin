@@ -11,13 +11,13 @@ import (
 )
 
 type Block struct {
-	Data       string `json:"data"`
-	Hash       string `json:"hash"`
-	PrevHash   string `json:"prevHash,omitempty"`
-	Height     int    `json:"height"`
-	Difficulty int    `json:"difficulty"`
-	Nonce      int    `json:"nonce"`
-	Timestamp  int    `json:"timestamp"`
+	Hash         string `json:"hash"`
+	PrevHash     string `json:"prevHash,omitempty"`
+	Height       int    `json:"height"`
+	Difficulty   int    `json:"difficulty"`
+	Nonce        int    `json:"nonce"`
+	Timestamp    int    `json:"timestamp"`
+	Transactions []*Tx  `json:"transactions"`
 }
 
 func (b *Block) persist() {
@@ -27,7 +27,6 @@ func (b *Block) persist() {
 //DB 에서 받은 byte slice를 Decode 함.
 func (b *Block) restore(data []byte) {
 	utils.FromBytes(b, data)
-
 }
 
 var ErrNotFound = errors.New("block not found")
@@ -61,14 +60,16 @@ func (b *Block) mine() {
 	}
 }
 
-func createBlock(data string, prevHash string, height int) *Block {
+func createBlock(prevHash string, height int) *Block {
 	block := &Block{
-		Data:       data,
-		Hash:       "",
-		PrevHash:   prevHash,
-		Height:     height,
-		Difficulty: Blockchain().difficulty(),
-		Nonce:      0,
+
+		Hash:         "",
+		PrevHash:     prevHash,
+		Height:       height,
+		Difficulty:   Blockchain().difficulty(),
+		Nonce:        0,
+		Transactions: []*Tx{makeCoinbaseTx("gyu")},
+		//address changed necessary
 	}
 	block.mine()
 	block.persist()

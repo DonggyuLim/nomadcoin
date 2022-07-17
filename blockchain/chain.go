@@ -34,8 +34,8 @@ func (b *blockchain) persist() {
 }
 
 //block append in blockchain
-func (b *blockchain) AddBlock(data string) {
-	block := createBlock(data, b.NewestHash, b.Height+1)
+func (b *blockchain) AddBlock() {
+	block := createBlock(b.NewestHash, b.Height+1)
 	b.NewestHash = block.Hash
 	b.Height = block.Height
 	b.CurrentDiffculty = block.Difficulty
@@ -87,6 +87,38 @@ func (b *blockchain) difficulty() int {
 	}
 }
 
+func (b *blockchain) txOuts() []*TxOut {
+	var txOuts []*TxOut
+	blocks := b.Blocks()
+	for _, block := range blocks {
+		for _, tx := range block.Transactions {
+			txOuts = append(txOuts, tx.TxOuts...)
+		}
+	}
+	return txOuts
+}
+
+//address -> txOuts
+func (b *blockchain) TxOutsByAddress(address string) []*TxOut {
+	var ownedTxOuts []*TxOut
+	txOuts := b.txOuts()
+	for _, txOut := range txOuts {
+		if txOut.Owner == address {
+			ownedTxOuts = append(ownedTxOuts, txOut)
+		}
+	}
+	return ownedTxOuts
+}
+
+func (b *blockchain) BlanaceByAddress(address string) int {
+	txOuts := b.TxOutsByAddress(address)
+	var amount int
+	for _, txOut := range txOuts {
+		amount += txOut.Amount
+	}
+	return amount
+}
+
 func Blockchain() *blockchain {
 	if b == nil {
 		once.Do(func() {
@@ -98,7 +130,7 @@ func Blockchain() *blockchain {
 			checkpoint := db.Checkpoint()
 			//db.Blockchain()이 nil 이라면 genesisBlock 생성
 			if checkpoint == nil {
-				b.AddBlock("Genesis")
+				b.AddBlock()
 			} else {
 				fmt.Println("Restoring..")
 				b.restore(checkpoint)
