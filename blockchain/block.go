@@ -10,6 +10,8 @@ import (
 	"nomadcoin/utils"
 )
 
+var ErrNotFound = errors.New("block not found")
+
 type Block struct {
 	Hash         string `json:"hash"`
 	PrevHash     string `json:"prevHash,omitempty"`
@@ -28,8 +30,6 @@ func (b *Block) persist() {
 func (b *Block) restore(data []byte) {
 	utils.FromBytes(b, data)
 }
-
-var ErrNotFound = errors.New("block not found")
 
 func FindBlock(hash string) (*Block, error) {
 	blockBytes := db.Block(hash)
@@ -60,18 +60,17 @@ func (b *Block) mine() {
 	}
 }
 
-func createBlock(prevHash string, height int) *Block {
-	block := &Block{
+func createBlock(prevHash string, height int, diff int) *Block {
 
-		Hash:         "",
-		PrevHash:     prevHash,
-		Height:       height,
-		Difficulty:   Blockchain().difficulty(),
-		Nonce:        0,
-		Transactions: []*Tx{makeCoinbaseTx("gyu")},
-		//address changed necessary
+	block := &Block{
+		Hash:       "",
+		PrevHash:   prevHash,
+		Height:     height,
+		Difficulty: diff,
+		Nonce:      0,
 	}
 	block.mine()
+	block.Transactions = Mempool.TxToConfirm()
 	block.persist()
 	return block
 }

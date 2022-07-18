@@ -29,21 +29,21 @@ func (b *blockchain) restore(data []byte) {
 	utils.HandleErr(gob.NewDecoder(bytes.NewReader(data)).Decode(b))
 }
 
-func (b *blockchain) persist() {
+func persistBlockchain(b *blockchain) {
 	db.SaveCheckPoint(utils.ToBytes(b))
 }
 
 //block append in blockchain
 func (b *blockchain) AddBlock() {
-	block := createBlock(b.NewestHash, b.Height+1)
+	block := createBlock(b.NewestHash, b.Height+1, difficulty(b))
 	b.NewestHash = block.Hash
 	b.Height = block.Height
 	b.CurrentDiffculty = block.Difficulty
-	b.persist()
+	persistBlockchain(b)
 }
 
 //get allBlocks
-func (b *blockchain) Blocks() []*Block {
+func Blocks(b *blockchain) []*Block {
 	var blocks []*Block
 	hashCursor := b.NewestHash
 	for {
@@ -59,8 +59,8 @@ func (b *blockchain) Blocks() []*Block {
 }
 
 //Difficulty are controled by block generation time.
-func (b *blockchain) recaculateDifficulty() int {
-	allBlocks := b.Blocks()
+func recaculateDifficulty(b *blockchain) int {
+	allBlocks := Blocks(b)
 	newestBlock := allBlocks[0]
 	lastRecalculatedBlock := allBlocks[difficultyInterval-1]
 	actualTime := (newestBlock.Timestamp / 60) - (lastRecalculatedBlock.Timestamp / 60)
@@ -76,42 +76,48 @@ func (b *blockchain) recaculateDifficulty() int {
 }
 
 //difficulty control
-func (b *blockchain) difficulty() int {
+func difficulty(b *blockchain) int {
 	if b.Height == 0 {
 		return defaultDifficulty
 	} else if b.Height%difficultyInterval == 0 {
 		//recaculate the difficulty
-		return b.recaculateDifficulty()
+		return recaculateDifficulty(b)
 	} else {
 		return b.CurrentDiffculty
 	}
 }
 
-func (b *blockchain) txOuts() []*TxOut {
-	var txOuts []*TxOut
-	blocks := b.Blocks()
-	for _, block := range blocks {
+//unspent txOut
+//uhm...
+func UTxOutsByAddress(address string, blockchain *blockchain) []*UtxOut {
+	var uTxOuts []*UtxOut
+	creatorTxs := make(map[string]bool)
+	for _, block := range Blocks(b) {
 		for _, tx := range block.Transactions {
-			txOuts = append(txOuts, tx.TxOuts...)
+			for _, input := range tx.TxIns {
+				if input.Owner == address {
+					creatorTxs[input.TxId] = true
+				}
+			}
+			for index, output := range tx.TxOuts {
+				if output.Owner == address {
+					if _, ok := creatorTxs[tx.Id]; !ok {
+						uTxOut := &UtxOut{tx.Id, index, output.Amount}
+						if !isOnMempool(uTxOut) {
+							uTxOuts = append(uTxOuts, uTxOut)
+						}
+					}
+				}
+
+			}
 		}
 	}
-	return txOuts
+	return uTxOuts
 }
 
-//address -> txOuts
-func (b *blockchain) TxOutsByAddress(address string) []*TxOut {
-	var ownedTxOuts []*TxOut
-	txOuts := b.txOuts()
-	for _, txOut := range txOuts {
-		if txOut.Owner == address {
-			ownedTxOuts = append(ownedTxOuts, txOut)
-		}
-	}
-	return ownedTxOuts
-}
-
-func (b *blockchain) BlanaceByAddress(address string) int {
-	txOuts := b.TxOutsByAddress(address)
+//owner amount
+func BlanaceByAddress(address string, blockchain *blockchain) int {
+	txOuts := UTxOutsByAddress(address, blockchain)
 	var amount int
 	for _, txOut := range txOuts {
 		amount += txOut.Amount
@@ -120,25 +126,23 @@ func (b *blockchain) BlanaceByAddress(address string) int {
 }
 
 func Blockchain() *blockchain {
-	if b == nil {
-		once.Do(func() {
-			b = &blockchain{
-				Height: 0,
-			}
-			fmt.Printf("NewestHash:%s\nHeight:%d\n", b.NewestHash, b.Height)
-			//serch for checkpoint on the db
-			checkpoint := db.Checkpoint()
-			//db.Blockchain()이 nil 이라면 genesisBlock 생성
-			if checkpoint == nil {
-				b.AddBlock()
-			} else {
-				fmt.Println("Restoring..")
-				b.restore(checkpoint)
-			}
+	once.Do(func() {
+		b = &blockchain{
+			Height: 0,
+		}
+		fmt.Printf("NewestHash:%s\nHeight:%d\n", b.NewestHash, b.Height)
+		//serch for checkpoint on the db
+		checkpoint := db.Checkpoint()
+		//db.Blockchain()이 nil 이라면 genesisBlock 생성
+		if checkpoint == nil {
+			b.AddBlock()
+		} else {
+			fmt.Println("Restoring..")
+			b.restore(checkpoint)
+		}
 
-			//db가 있다면 restore b from bytes
-		})
-	}
+		//db가 있다면 restore b from bytes
+	})
 	fmt.Println(b.NewestHash)
 	return b
 }
