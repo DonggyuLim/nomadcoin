@@ -11,6 +11,7 @@ import (
 
 	"nomadcoin/blockchain"
 	"nomadcoin/utils"
+	"nomadcoin/wallet"
 
 	"github.com/gorilla/mux"
 )
@@ -47,6 +48,10 @@ type addTxPayload struct {
 }
 type errorResponse struct {
 	ErrorMessage string `json:"errorMessage"`
+}
+
+type myWalletResponse struct {
+	Address string `json:"address"`
 }
 
 func documentation(rw http.ResponseWriter, r *http.Request) {
@@ -185,11 +190,17 @@ func transactions(rw http.ResponseWriter, r *http.Request) {
 	utils.HandleErr(json.NewDecoder(r.Body).Decode(&payload))
 	err := blockchain.Mempool.AddTx(payload.To, payload.Amount)
 	if err != nil {
+		rw.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(rw).Encode(errorResponse{"not enough funds"})
-
+		return
 	}
 	rw.WriteHeader(http.StatusCreated)
 
+}
+
+func myWallet(rw http.ResponseWriter, r *http.Request) {
+	address := wallet.Wallet().Address
+	json.NewEncoder(rw).Encode(myWalletResponse{Address: address})
 }
 
 func Start(aPort int) {
@@ -204,6 +215,7 @@ func Start(aPort int) {
 	router.HandleFunc("/balance/{address}", balance).Methods("GET")
 	router.HandleFunc("/mempool", mempool)
 	router.HandleFunc("/transactions", transactions).Methods("POST")
+	router.HandleFunc("/wallet", myWallet)
 	fmt.Printf("Listening on http://localhost%s\n", port)
 	log.Fatal(http.ListenAndServe(port, router))
 }

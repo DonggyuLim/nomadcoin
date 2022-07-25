@@ -48,22 +48,25 @@ func restoreKey() *ecdsa.PrivateKey {
 	utils.HandleErr(err)
 	return key
 }
+func encodeBigIntsByte(a, b []byte) string {
+	bigIntBytes := append(a, b...)
+	return fmt.Sprintf("%x", bigIntBytes)
+}
 
-func addressFromKey(key *ecdsa.PrivateKey) string {
+func getAddressFromPrivKey(key *ecdsa.PrivateKey) string {
 	x := key.X.Bytes()
 	y := key.Y.Bytes()
-	z := append(x, y...)
-	return fmt.Sprintf("%x", z)
+	return encodeBigIntsByte(x, y)
 
 }
 
-func Sign(payload string, wallet *wallet) string {
+func Sign(payload string, wallet wallet) string {
 	payloadAsByte, err := hex.DecodeString(payload)
 	utils.HandleErr(err)
 	r, s, err := ecdsa.Sign(rand.Reader, wallet.privateKey, payloadAsByte)
 	utils.HandleErr(err)
-	signature := append(r.Bytes(), s.Bytes()...)
-	return fmt.Sprintf("%x", signature)
+	signature := encodeBigIntsByte(r.Bytes(), s.Bytes())
+	return signature
 }
 
 func restoreBigInt(payload string) (*big.Int, *big.Int, error) {
@@ -83,7 +86,7 @@ func restoreBigInt(payload string) (*big.Int, *big.Int, error) {
 	return bigR, bigS, nil
 }
 
-func verify(signature, payload, address string) bool {
+func Verify(signature, payload, address string) bool {
 	r, s, err := restoreBigInt(signature)
 	utils.HandleErr(err)
 	x, y, err := restoreBigInt(address)
@@ -112,7 +115,7 @@ func Wallet() *wallet {
 		}
 		//yes -> restore from file
 		// no -> create prv key,save to file
-		w.Address = addressFromKey(w.privateKey)
+		w.Address = getAddressFromPrivKey(w.privateKey)
 	}
 	return w
 }
