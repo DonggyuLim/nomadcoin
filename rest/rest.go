@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	"nomadcoin/blockchain"
+	"nomadcoin/p2p"
 	"nomadcoin/utils"
 	"nomadcoin/wallet"
 
@@ -105,9 +106,14 @@ func documentation(rw http.ResponseWriter, r *http.Request) {
 			Description: "Get TxOuts for an Address",
 		},
 		{
-			URL:         url("mempool"),
+			URL:         url("/mempool"),
 			Method:      "GET",
 			Description: "mempool view",
+		},
+		{
+			URL:         url("/ws"),
+			Method:      "GET",
+			Description: "Upgrade to Web Sockets",
 		},
 	}
 
@@ -164,6 +170,13 @@ func jsonContentTypeMiddleWare(next http.Handler) http.Handler {
 	})
 }
 
+func loggerMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		fmt.Println(r.URL)
+		next.ServeHTTP(rw, r)
+	})
+}
+
 // /balance/{address} -> balance
 func balance(rw http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
@@ -203,11 +216,30 @@ func myWallet(rw http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(rw).Encode(myWalletResponse{Address: address})
 }
 
+type addPeerPayload struct {
+	Address, Port string
+}
+
+func addPeers(rw http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case "POST":
+		var payload addPeerPayload
+		json.NewDecoder(r.Body).Decode(&payload)
+		p2p.AddPeer(payload.Address, payload.Port, port)
+		rw.WriteHeader(http.StatusOK)
+	case "GET":
+		json.NewEncoder(rw).Encode(p2p.AllPeers(&p2p.Peers))
+	}
+
+}
+
 func Start(aPort int) {
 	router := mux.NewRouter()
 	//모든 요청에 	rw.Header().Add("Content-Type", "application/json") 해줌.
+
 	port = fmt.Sprintf(":%d", aPort)
-	router.Use(jsonContentTypeMiddleWare)
+	router.Use(jsonContentTypeMiddleWare, loggerMiddleware)
+
 	router.HandleFunc("/", documentation).Methods("GET")
 	router.HandleFunc("/status", status)
 	router.HandleFunc("/blocks/{hash:[a-f0-9]+}", block).Methods("GET")
@@ -216,6 +248,8 @@ func Start(aPort int) {
 	router.HandleFunc("/mempool", mempool)
 	router.HandleFunc("/transactions", transactions).Methods("POST")
 	router.HandleFunc("/wallet", myWallet)
+	router.HandleFunc("/ws", p2p.Upgrade).Methods("GET")
+	router.HandleFunc("/peers", addPeers).Methods("GET", "POST")
 	fmt.Printf("Listening on http://localhost%s\n", port)
 	log.Fatal(http.ListenAndServe(port, router))
 }

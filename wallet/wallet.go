@@ -57,7 +57,6 @@ func getAddressFromPrivKey(key *ecdsa.PrivateKey) string {
 	x := key.X.Bytes()
 	y := key.Y.Bytes()
 	return encodeBigIntsByte(x, y)
-
 }
 
 func Sign(payload string, wallet wallet) string {

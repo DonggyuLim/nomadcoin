@@ -4,7 +4,7 @@ import (
 	"nomadcoin/utils"
 	"sync"
 
-	"github.com/boltdb/bolt"
+	bolt "go.etcd.io/bbolt"
 )
 
 //initialize
