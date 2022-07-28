@@ -3,7 +3,9 @@ package blockchain
 import (
 	"bytes"
 	"encoding/gob"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"nomadcoin/db"
 	"nomadcoin/utils"
 	"sync"
@@ -13,6 +15,7 @@ type blockchain struct {
 	NewestHash       string `json:"newestHash"`
 	Height           int    `json:"height"`
 	CurrentDiffculty int    `json:"currentDifficulty"`
+	mutex            sync.Mutex
 }
 
 const (
@@ -34,12 +37,13 @@ func persistBlockchain(b *blockchain) {
 }
 
 //block append in blockchain
-func (b *blockchain) AddBlock() {
+func (b *blockchain) AddBlock() *Block {
 	block := createBlock(b.NewestHash, b.Height+1, difficulty(b))
 	b.NewestHash = block.Hash
 	b.Height = block.Height
 	b.CurrentDiffculty = block.Difficulty
 	persistBlockchain(b)
+	return block
 }
 func Txs(b *blockchain) []*Tx {
 	var txs []*Tx
@@ -61,6 +65,8 @@ func FindTx(b *blockchain, targetID string) *Tx {
 
 //get allBlocks
 func Blocks(b *blockchain) []*Block {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
 	var blocks []*Block
 	hashCursor := b.NewestHash
 	for {
@@ -165,4 +171,44 @@ func Blockchain() *blockchain {
 	})
 	fmt.Println(b.NewestHash)
 	return b
+}
+
+func Status(b *blockchain, rw http.ResponseWriter) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	err := json.NewEncoder(rw).Encode(b)
+	utils.HandleErr(err)
+}
+
+func (b *blockchain) Replace(newBlocks []*Block) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	b.CurrentDiffculty = newBlocks[0].Difficulty
+	b.Height = len(newBlocks)
+	b.NewestHash = newBlocks[0].Hash
+	persistBlockchain(b)
+	db.EmptyBlocks()
+	for _, block := range newBlocks {
+		block.persistBlock()
+	}
+}
+
+func (b *blockchain) AddPeerBlock(block *Block) {
+	b.mutex.Lock()
+	m.mutex.Lock()
+	defer b.mutex.Unlock()
+	defer m.mutex.Unlock()
+	b.Height += 1
+	b.CurrentDiffculty = block.Difficulty
+	b.NewestHash = block.Hash
+	persistBlockchain(b)
+	block.persistBlock()
+
+	// 블록을 검증해야함
+	for _, tx := range block.Transactions {
+		_, ok := m.Txs[tx.Id]
+		if ok {
+			delete(m.Txs, tx.Id)
+		}
+	}
 }

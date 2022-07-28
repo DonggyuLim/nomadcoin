@@ -26,12 +26,13 @@ func (p *peer) read() {
 	//delete peer in case of error
 	defer p.close()
 	for {
-		_, m, err := p.conn.ReadMessage()
+		m := Message{}
+		err := p.conn.ReadJSON(&m)
 		if err != nil {
 
 			break
 		}
-		fmt.Printf("%s\n", m)
+		handleMsg(&m, p)
 	}
 }
 
@@ -67,6 +68,8 @@ var Peers peers = peers{
 }
 
 func initPeer(conn *websocket.Conn, address, port string) *peer {
+	Peers.mutex.Lock()
+	defer Peers.mutex.Unlock()
 	key := fmt.Sprintf("%s:%s", address, port)
 	p := &peer{
 

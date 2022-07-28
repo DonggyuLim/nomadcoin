@@ -4,6 +4,7 @@ import (
 	"errors"
 	"nomadcoin/utils"
 	"nomadcoin/wallet"
+	"sync"
 	"time"
 )
 
@@ -12,10 +13,22 @@ const (
 )
 
 type mempool struct {
-	Txs []*Tx
+	Txs   map[string]*Tx
+	mutex sync.Mutex
 }
 
-var Mempool *mempool = &mempool{}
+var m *mempool = &mempool{}
+var memOnce sync.Once
+
+func Mempool() *mempool {
+	memOnce.Do(func() {
+		m = &mempool{
+			Txs:   make(map[string]*Tx),
+			mutex: sync.Mutex{},
+		}
+	})
+	return m
+}
 
 type Tx struct {
 	Id        string   `json:"id"`
@@ -69,7 +82,7 @@ func validate(tx *Tx) bool {
 
 func isOnMempool(uTxOut *UtxOut) bool {
 
-	for _, tx := range Mempool.Txs {
+	for _, tx := range Mempool().Txs {
 		for _, input := range tx.TxIns {
 			if input.TxId == uTxOut.TxID && input.Index == uTxOut.Index {
 				return true
@@ -138,13 +151,13 @@ func makeTx(from, to string, amount int) (*Tx, error) {
 	return tx, nil
 }
 
-func (m *mempool) AddTx(to string, amount int) error {
+func (m *mempool) AddTx(to string, amount int) (*Tx, error) {
 	tx, err := makeTx(wallet.Wallet().Address, to, amount)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	m.Txs = append(m.Txs, tx)
-	return nil
+	m.Txs[tx.Id] = tx
+	return tx, nil
 }
 
 //miner will confirm transaction in mempool
@@ -152,8 +165,18 @@ func (m *mempool) AddTx(to string, amount int) error {
 func (m *mempool) TxToConfirm() []*Tx {
 	//address changed necessary
 	coinbase := makeCoinbaseTx(wallet.Wallet().Address)
-	txs := m.Txs
+	var txs []*Tx
+	for _, tx := range m.Txs {
+		txs = append(txs, tx)
+	}
 	txs = append(txs, coinbase)
-	m.Txs = nil
+	m.Txs = make(map[string]*Tx)
 	return txs
+}
+
+func (m *mempool) AddPeerTx(tx *Tx) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	m.Txs[tx.Id] = tx
 }

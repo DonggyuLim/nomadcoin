@@ -1,7 +1,9 @@
 package db
 
 import (
+	"fmt"
 	"nomadcoin/utils"
+	"os"
 	"sync"
 
 	bolt "go.etcd.io/bbolt"
@@ -12,15 +14,21 @@ var db *bolt.DB
 var once sync.Once
 
 const (
-	dbName       = "blockchain.db"
+	dbName       = "blockchain"
 	dataBucket   = "data"
 	blocksBucket = "blocks"
 	checkpoint   = "checkpoint"
 )
 
+func getDBname() string {
+	port := os.Args[2][6:]
+	return fmt.Sprintf("%s_%s.db", dbName, port)
+}
+
 func DB() *bolt.DB {
 	if db == nil {
-		dbPointer, err := bolt.Open(dbName, 0600, nil)
+
+		dbPointer, err := bolt.Open(getDBname(), 0600, nil)
 		utils.HandleErr(err)
 
 		db = dbPointer
@@ -88,4 +96,16 @@ func Block(hash string) []byte {
 
 	utils.HandleErr(err)
 	return data
+}
+
+func EmptyBlocks() {
+	err := DB().Update(func(tx *bolt.Tx) error {
+		err := tx.DeleteBucket([]byte(blocksBucket))
+		utils.HandleErr(err)
+		_, err = tx.CreateBucket([]byte(blocksBucket))
+		utils.HandleErr(err)
+
+		return nil
+	})
+	utils.HandleErr(err)
 }
