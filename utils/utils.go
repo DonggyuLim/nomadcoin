@@ -1,3 +1,5 @@
+// Package utils contains functions to be used across application
+
 package utils
 
 import (
@@ -25,6 +27,7 @@ func ToBytes(i interface{}) []byte {
 }
 
 //byte -> data
+//FromBytes takes an interface and data and the will encode the data to the interface
 func FromBytes(i interface{}, data []byte) {
 	encoder := gob.NewDecoder(bytes.NewReader(data))
 	HandleErr(encoder.Decode(i))
@@ -37,7 +40,7 @@ func Hash(a interface{}) string {
 	return fmt.Sprintf("%x", hash)
 }
 
-func IPSplitter(s string, sep string, i int) string {
+func Splitter(s string, sep string, i int) string {
 	result := strings.Split(s, sep)
 	if len(result)-1 < i {
 		return ""
@@ -45,6 +48,7 @@ func IPSplitter(s string, sep string, i int) string {
 	return result[i]
 }
 
+//json -> byte
 func ToJSON(i interface{}) []byte {
 	r, err := json.Marshal(i)
 	HandleErr(err)

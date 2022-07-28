@@ -16,7 +16,7 @@ func Upgrade(rw http.ResponseWriter, r *http.Request) {
 	//port :3000 will upgrade the request from 4000
 
 	openPort := r.URL.Query().Get("openPort")
-	ip := utils.IPSplitter(r.RemoteAddr, ":", 0)
+	ip := utils.Splitter(r.RemoteAddr, ":", 0)
 	upgrader.CheckOrigin = func(r *http.Request) bool {
 		return openPort != "" || ip != ""
 	}
