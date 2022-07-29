@@ -3,6 +3,9 @@ package wallet
 import (
 	"crypto/x509"
 	"encoding/hex"
+	"io/fs"
+	"nomadcoin/utils"
+	"reflect"
 	"testing"
 )
 
@@ -26,4 +29,67 @@ func TestSign(t *testing.T) {
 	if err != nil {
 		t.Errorf("Sign() should return a hex encoded string,got %s", s)
 	}
+}
+
+func TestVerify(t *testing.T) {
+	type test struct {
+		input string
+		ok    bool
+	}
+	tests := []test{
+		{testPayload, true},
+		{"0b26d0aa25e3ea7655ac1c3c5b8265e9df715b6284a02596bf915ca9df40edee", false},
+	}
+	for _, tc := range tests {
+		w := makeTestWallet()
+		ok := Verify(testSig, tc.input, w.Address)
+		if ok != tc.ok {
+			t.Error("Verify() could not verify testSignature and testPayload")
+		}
+	}
+
+}
+
+func TestRestoreBigInts(t *testing.T) {
+	_, _, err := restoreBigInt("xx")
+	if err == nil {
+		t.Error("restoreBigInts should return error when payload is not hex")
+	}
+}
+
+type fakeLayer struct {
+	fakeHasWalletFile func() bool
+}
+
+func (f fakeLayer) hasWalletFile() bool {
+	return f.fakeHasWalletFile()
+}
+
+func (fakeLayer) writeFile(name string, data []byte, perm fs.FileMode) error {
+	return nil
+}
+
+func (fakeLayer) readFile(filename string) ([]byte, error) {
+	return utils.ToBytes(makeTestWallet().privateKey), nil
+}
+
+func TestWallet(t *testing.T) {
+	t.Run("Wallet is created", func(t *testing.T) {
+		files = fakeLayer{
+			fakeHasWalletFile: func() bool { return false },
+		}
+		w := Wallet()
+		if reflect.TypeOf(w) != reflect.TypeOf(&wallet{}) {
+			t.Error("New wallet should return a new wallet instance")
+		}
+	})
+	t.Run("Wallet is restored", func(t *testing.T) {
+		files = fakeLayer{
+			fakeHasWalletFile: func() bool { return true },
+		}
+		w = nil
+		if reflect.TypeOf(w) != reflect.TypeOf(&wallet{}) {
+			t.Error("New wallet should return a new wallet instance")
+		}
+	})
 }
