@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"nomadcoin/db"
 	"nomadcoin/utils"
 )
 
@@ -23,7 +22,8 @@ type Block struct {
 }
 
 func (b *Block) persistBlock() {
-	db.SaveBlock(b.Hash, utils.ToBytes(b))
+	dbStorage.SaveBlock(b.Hash, utils.ToBytes(b))
+
 }
 
 //DB 에서 받은 byte slice를 Decode 함.
@@ -32,7 +32,8 @@ func (b *Block) restore(data []byte) {
 }
 
 func FindBlock(hash string) (*Block, error) {
-	blockBytes := db.Block(hash)
+	// blockBytes := db.Block(hash)
+	blockBytes := dbStorage.FindBlock(hash)
 	if blockBytes == nil {
 		return nil, ErrNotFound
 	}
@@ -69,8 +70,8 @@ func createBlock(prevHash string, height int, diff int) *Block {
 		Difficulty: diff,
 		Nonce:      0,
 	}
-	block.mine()
 	block.Transactions = Mempool().TxToConfirm()
+	block.mine()
 	block.persistBlock()
 	return block
 }

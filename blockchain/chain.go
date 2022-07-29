@@ -11,21 +11,29 @@ import (
 	"sync"
 )
 
-type blockchain struct {
-	NewestHash       string `json:"newestHash"`
-	Height           int    `json:"height"`
-	CurrentDiffculty int    `json:"currentDifficulty"`
-	mutex            sync.Mutex
-}
-
 const (
 	defaultDifficulty  int = 2
 	difficultyInterval int = 5
 	blockInterval      int = 2
 )
 
+type blockchain struct {
+	NewestHash       string `json:"newestHash"`
+	Height           int    `json:"height"`
+	CurrentDiffculty int    `json:"currentDifficulty"`
+	mutex            sync.Mutex
+}
+type Storage interface {
+	FindBlock(hash string) []byte
+	SaveBlock(hash string, data []byte)
+	SaveChain(data []byte)
+	LoadChain() []byte
+	DeleteAllBlocks()
+}
+
 var b *blockchain
 var once sync.Once
+var dbStorage Storage = db.DB{}
 
 //byte 값을 decoding 해주는 함수
 func (b *blockchain) restore(data []byte) {
@@ -33,7 +41,7 @@ func (b *blockchain) restore(data []byte) {
 }
 
 func persistBlockchain(b *blockchain) {
-	db.SaveCheckPoint(utils.ToBytes(b))
+	dbStorage.SaveChain(utils.ToBytes(b))
 }
 
 //block append in blockchain
@@ -158,7 +166,7 @@ func Blockchain() *blockchain {
 		}
 		fmt.Printf("NewestHash:%s\nHeight:%d\n", b.NewestHash, b.Height)
 		//serch for checkpoint on the db
-		checkpoint := db.Checkpoint()
+		checkpoint := dbStorage.LoadChain()
 		//db.Blockchain()이 nil 이라면 genesisBlock 생성
 		if checkpoint == nil {
 			b.AddBlock()
@@ -187,7 +195,7 @@ func (b *blockchain) Replace(newBlocks []*Block) {
 	b.Height = len(newBlocks)
 	b.NewestHash = newBlocks[0].Hash
 	persistBlockchain(b)
-	db.EmptyBlocks()
+	dbStorage.DeleteAllBlocks()
 	for _, block := range newBlocks {
 		block.persistBlock()
 	}
@@ -204,7 +212,9 @@ func (b *blockchain) AddPeerBlock(block *Block) {
 	persistBlockchain(b)
 	block.persistBlock()
 
-	// 블록을 검증해야함
+	// 블록을 검증해야함 그냥 블록에 담겨진 트랜잭션을 멤풀에서 지우는게 아닌
+	//검증을 하는 방법을 고민해볼 필요가 있음.
+	//그리고 거짓 블록이라면 받으면 안됨.
 	for _, tx := range block.Transactions {
 		_, ok := m.Txs[tx.Id]
 		if ok {

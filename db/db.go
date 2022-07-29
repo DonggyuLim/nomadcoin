@@ -13,6 +13,25 @@ import (
 var db *bolt.DB
 var once sync.Once
 
+type DB struct{}
+
+func (DB) FindBlock(hash string) []byte {
+	return findBlock(hash)
+}
+func (DB) SaveBlock(hash string, data []byte) {
+	saveBlock(hash, data)
+}
+func (DB) SaveChain(data []byte) {
+	saveChain(data)
+}
+func (DB) LoadChain() []byte {
+	return loadChain()
+}
+
+func (DB) DeleteAllBlocks() {
+	emptyBlocks()
+}
+
 const (
 	dbName       = "blockchain"
 	dataBucket   = "data"
@@ -25,7 +44,7 @@ func getDBname() string {
 	return fmt.Sprintf("%s_%s.db", dbName, port)
 }
 
-func DB() *bolt.DB {
+func InitDB() {
 	if db == nil {
 
 		dbPointer, err := bolt.Open(getDBname(), 0600, nil)
@@ -41,18 +60,17 @@ func DB() *bolt.DB {
 		})
 		utils.HandleErr(err)
 	}
-	//bolt 에는 bucket 이라는게있음 table 이 아니라
-	return db
+
 }
 
 func Close() {
-	DB().Close()
+	db.Close()
 }
 
 //
-func SaveBlock(hash string, data []byte) {
+func saveBlock(hash string, data []byte) {
 
-	err := DB().Update(func(tx *bolt.Tx) error {
+	err := db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(blocksBucket))
 		err := bucket.Put([]byte(hash), data)
 		return err
@@ -60,8 +78,8 @@ func SaveBlock(hash string, data []byte) {
 	utils.HandleErr(err)
 }
 
-func SaveCheckPoint(data []byte) {
-	err := DB().Update(func(tx *bolt.Tx) error {
+func saveChain(data []byte) {
+	err := db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(dataBucket))
 		err := bucket.Put([]byte(checkpoint), data)
 		return err
@@ -71,10 +89,10 @@ func SaveCheckPoint(data []byte) {
 
 //bolt 는 정렬기능이 없음 key value 저장소이기 때문에
 
-func Checkpoint() []byte {
+func loadChain() []byte {
 	var data []byte
 	//DB.View()는 read-only 트랜잭션
-	err := DB().View(func(tx *bolt.Tx) error {
+	err := db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(dataBucket))
 		data = bucket.Get([]byte(checkpoint))
 		//Get =return  slice or nil
@@ -85,9 +103,9 @@ func Checkpoint() []byte {
 	return data
 }
 
-func Block(hash string) []byte {
+func findBlock(hash string) []byte {
 	var data []byte
-	err := DB().View(func(tx *bolt.Tx) error {
+	err := db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(blocksBucket))
 		data = bucket.Get([]byte(hash))
 		//bucket.Get() =return  slice or nil
@@ -98,8 +116,8 @@ func Block(hash string) []byte {
 	return data
 }
 
-func EmptyBlocks() {
-	err := DB().Update(func(tx *bolt.Tx) error {
+func emptyBlocks() {
+	err := db.Update(func(tx *bolt.Tx) error {
 		err := tx.DeleteBucket([]byte(blocksBucket))
 		utils.HandleErr(err)
 		_, err = tx.CreateBucket([]byte(blocksBucket))
